@@ -126,59 +126,50 @@ WORD mixConsoleColor(const WORD &foregroundColor = 7, const WORD &backgroundColo
 	return backgroundColor << 4 | foregroundColor;
 }
 class ButtonColor {
-	public:
-		WORD highlightColor;
-		WORD defaultColor;
-		ButtonColor() {
-			highlightColor = consoleColor.brightCyan;
-			defaultColor = consoleColor.White;
-		}
-		ButtonColor(WORD button_highlight_color, WORD button_default_color = consoleColor.White) {
-			set(button_highlight_color, button_default_color);
-		}
-		void set(WORD button_highlight_color, WORD button_default_color = consoleColor.White) {
-			highlightColor = button_highlight_color;
-			defaultColor = button_default_color;
-		}
-		void toDefaultColor() {
-			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), defaultColor);
-		}
-		void toHighlightColor() {
-			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), highlightColor);
-		}
+public:
+	WORD highlightColor;
+	WORD defaultColor;
+	ButtonColor() { _init(consoleColor.brightCyan, consoleColor.White); }
+	ButtonColor(const WORD &button_highlight_color, const WORD &button_default_color = consoleColor.White) { _init(button_highlight_color, button_default_color); }
+	void _init(const WORD &button_highlight_color, const WORD &button_default_color) {
+		highlightColor = button_highlight_color, defaultColor = button_default_color;
+	}
+	void toDefaultColor() {
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), defaultColor);
+	}
+	void toHighlightColor() {
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), highlightColor);
+	}
 };
 bool operator== (const ButtonColor &a, const ButtonColor &b) {
 	return a.highlightColor == b.highlightColor && a.defaultColor == b.defaultColor;
 }
 class Button {
-	public:
-		COORD position;
-		std::string text;
-		std::string event;
-		ButtonColor color;
-		bool clickable;
-		bool visible;
-		Button() {
-			position = {0, 0};
-			text = "";
-			event = "";
-			color.set(consoleColor.brightCyan, consoleColor.White);
-			clickable = true;
-			visible = true;
+public:
+	COORD position;
+	std::string text;
+	std::string event;
+	ButtonColor color;
+	bool clickable;
+	bool visible;
+	Button() { _init({0, 0}, "", "", ButtonColor(), true, true); }
+	Button(const COORD &_position, const std::string &_text, const std::string &_event, const ButtonColor &_color, const bool &_clickable, const bool &_visible) { _init(_position, _text, _event, _color, _clickable, _visible); }
+	inline void _init(const COORD &_position, const std::string &_text, const std::string &_event, const ButtonColor &_color, const bool &_clickable, const bool &_visible) {
+		position = _position, text = _text, event = _event, color = _color, clickable = _clickable, visible = _visible;
+	}
+	bool operator== (const Button &button) const {
+		return position == button.position && text == button.text && event == button.event && color == button.color && clickable == button.clickable && visible == button.visible;
+	}
+	bool operator== (const COORD &mousePosition) const {
+		if (clickable == false || visible == false) return false;
+		if (position.Y == mousePosition.Y && position.X <= mousePosition.X && mousePosition.X <= position.X + (SHORT)text.length() - 1) {
+			return true;
 		}
-		bool operator== (const Button &button) const {
-			return position == button.position && text == button.text && event == button.event && color == button.color && clickable == button.clickable && visible == button.visible;
-		}
-		bool operator== (const COORD &mousePosition) const {
-			if (clickable == false || visible == false) return false;
-			if (position.Y == mousePosition.Y && position.X <= mousePosition.X && mousePosition.X <= position.X + (SHORT)text.length() - 1) {
-				return true;
-			}
-			return false;
-		}
-		bool operator!= (const COORD &mousePosition) const {
-			return !operator==(mousePosition);
-		}
+		return false;
+	}
+	bool operator!= (const COORD &mousePosition) const {
+		return !operator==(mousePosition);
+	}
 };
 void printButton(Button &button, COORD offset = {0, 0}) {
 	if (button.visible) {
@@ -194,158 +185,158 @@ bool cmp_button(const Button &a, const Button &b) {
 	return a.position.X < b.position.X;
 }
 class Menu {
-	protected:
-		struct History {
-			History() {
-				color = consoleColor.White;
-				visible = true;
-				position = {-1, -1};
-				offset = {0, 0};
-				text = "";
-			}
-			WORD color;
-			bool visible;
-			COORD position;
-			COORD offset;
-			std::string text;
-			bool operator== (const Button &o) const {
-				return visible == o.visible && position == o.position && text == o.text;
-			}
-			bool operator!= (const Button &o) const {
-				return !operator==(o);
-			}
-		};
-	public:
-		struct timeval time_start;
-		std::vector<Button> buttonData;
-		std::vector<COORD> buttonOffset;
-		std::vector<History> buttonHistory;
+protected:
+	struct History {
+		History() {
+			color = consoleColor.White;
+			visible = true;
+			position = {-1, -1};
+			offset = {0, 0};
+			text = "";
+		}
+		WORD color;
+		bool visible;
 		COORD position;
-		long timeLimit;
+		COORD offset;
+		std::string text;
+		bool operator== (const Button &o) const {
+			return visible == o.visible && position == o.position && text == o.text;
+		}
+		bool operator!= (const Button &o) const {
+			return !operator==(o);
+		}
+	};
+public:
+	struct timeval time_start;
+	std::vector<Button> buttonData;
+	std::vector<COORD> buttonOffset;
+	std::vector<History> buttonHistory;
+	COORD position;
+	long timeLimit;
 
-		Menu() {
-			buttonData.clear();
-			buttonOffset.clear();
-			buttonHistory.clear();
-			position = {0, 0};
-			timeLimit = -1;
+	Menu() {
+		buttonData.clear();
+		buttonOffset.clear();
+		buttonHistory.clear();
+		position = {0, 0};
+		timeLimit = -1;
+	}
+	size_t size() {
+		return buttonData.size();
+	}
+	size_t find(Button button) {
+		size_t l = std::lower_bound(buttonData.begin(), buttonData.end(), button, cmp_button) - buttonData.begin();
+		size_t r = std::upper_bound(buttonData.begin(), buttonData.end(), button, cmp_button) - buttonData.begin();
+		for (size_t i = l; i < r; ++i) {
+			if (buttonData[i] == button)
+				return i;
 		}
-		size_t size() {
-			return buttonData.size();
+		return buttonData.size();
+	}
+	size_t findinText(std::string buttonText) {
+		for (size_t i = 0; i < buttonData.size(); ++i) {
+			if (buttonData[i].text == buttonText)
+				return i;
 		}
-		size_t find(Button button) {
-			size_t l = std::lower_bound(buttonData.begin(), buttonData.end(), button, cmp_button) - buttonData.begin();
-			size_t r = std::upper_bound(buttonData.begin(), buttonData.end(), button, cmp_button) - buttonData.begin();
-			for (size_t i = l; i < r; ++i) {
-				if (buttonData[i] == button)
-					return i;
-			}
-			return buttonData.size();
+		return buttonData.size();
+	}
+	size_t findinEvent(std::string buttonEvent) {
+		for (size_t i = 0; i < buttonData.size(); ++i) {
+			if (buttonData[i].event == buttonEvent)
+				return i;
 		}
-		size_t findinText(std::string buttonText) {
-			for (size_t i = 0; i < buttonData.size(); ++i) {
-				if (buttonData[i].text == buttonText)
-					return i;
-			}
-			return buttonData.size();
+		return buttonData.size();
+	}
+	bool reloadinEvent(Button button) {
+		size_t pos = findinEvent(button.event);
+		if (pos == buttonData.size()) return true;
+		buttonData[pos] = button;
+		return false;
+	}
+	bool fold(size_t pos, size_t length) {
+		if (pos + length > size()) return true;
+		for (size_t i = 0; i < length; ++i) {
+			buttonData[pos + i].visible = false;
 		}
-		size_t findinEvent(std::string buttonEvent) {
-			for (size_t i = 0; i < buttonData.size(); ++i) {
-				if (buttonData[i].event == buttonEvent)
-					return i;
-			}
-			return buttonData.size();
+		COORD offset = {0, SHORT(buttonData[pos].position.Y - buttonData[pos + length].position.Y)};
+		for (size_t i = pos; i < buttonData.size(); ++i) {
+			buttonOffset[i] += offset;
 		}
-		bool reloadinEvent(Button button) {
-			size_t pos = findinEvent(button.event);
-			if (pos == buttonData.size()) return true;
-			buttonData[pos] = button;
+		return false;
+	}
+	bool unfold(size_t pos, size_t length) {
+		if (pos + length > size()) return true;
+		for (size_t i = 0; i < length; ++i) {
+			buttonData[pos + i].visible = true;
+		}
+		COORD offset = {0, SHORT(buttonData[pos].position.Y - buttonData[pos + length].position.Y)};
+		for (size_t i = pos; i < buttonData.size(); ++i) {
+			buttonOffset[i] -= offset;
+		}
+		return false;
+	}
+	size_t push(Button button) {
+		if (buttonData.size() == 0) {
+			buttonData.push_back(button);
+			buttonOffset.push_back({0, 0});
+			buttonHistory.push_back(History());
+		} else {
+			size_t pos = std::upper_bound(buttonData.begin(), buttonData.end(), button, cmp_button) - buttonData.begin();
+			buttonData.insert(buttonData.begin() + pos, button);
+			buttonOffset.insert(buttonOffset.begin() + pos, {0, 0});
+			buttonHistory.insert(buttonHistory.begin() + pos, History());
+		}
+		return buttonData.size();
+	}
+	bool erase(size_t pos) {
+		if (pos != buttonData.size()) {
+			buttonData.erase(buttonData.begin() + pos);
+			buttonOffset.erase(buttonOffset.begin() + pos);
+			buttonHistory.erase(buttonHistory.begin() + pos);
 			return false;
 		}
-		bool fold(size_t pos, size_t length) {
-			if (pos + length > size()) return true;
-			for (size_t i = 0; i < length; ++i) {
-				buttonData[pos + i].visible = false;
-			}
-			COORD offset = {0, SHORT(buttonData[pos].position.Y - buttonData[pos + length].position.Y)};
-			for (size_t i = pos; i < buttonData.size(); ++i) {
-				buttonOffset[i] += offset;
-			}
-			return false;
-		}
-		bool unfold(size_t pos, size_t length) {
-			if (pos + length > size()) return true;
-			for (size_t i = 0; i < length; ++i) {
-				buttonData[pos + i].visible = true;
-			}
-			COORD offset = {0, SHORT(buttonData[pos].position.Y - buttonData[pos + length].position.Y)};
-			for (size_t i = pos; i < buttonData.size(); ++i) {
-				buttonOffset[i] -= offset;
-			}
-			return false;
-		}
-		size_t push(Button button) {
-			if (buttonData.size() == 0) {
-				buttonData.push_back(button);
-				buttonOffset.push_back({0, 0});
-				buttonHistory.push_back(History());
-			} else {
-				size_t pos = std::upper_bound(buttonData.begin(), buttonData.end(), button, cmp_button) - buttonData.begin();
-				buttonData.insert(buttonData.begin() + pos, button);
-				buttonOffset.insert(buttonOffset.begin() + pos, {0, 0});
-				buttonHistory.insert(buttonHistory.begin() + pos, History());
-			}
-			return buttonData.size();
-		}
-		bool erase(size_t pos) {
-			if (pos != buttonData.size()) {
-				buttonData.erase(buttonData.begin() + pos);
-				buttonOffset.erase(buttonOffset.begin() + pos);
-				buttonHistory.erase(buttonHistory.begin() + pos);
-				return false;
-			}
-			return true;
-		}
-		bool erase(Button button) {
-			return erase(find(button));
-		}
-		bool eraseinText(std::string text) {
-			return erase(findinText(text));
-		}
-		bool eraseinEvent(std::string event) {
-			return erase(findinEvent(event));
-		}
-		Menu &clear() {
-			buttonData.clear();
-			buttonOffset.clear();
-			buttonHistory.clear();
-			return *this;
-		}
-		bool setVisibleinIndex(size_t index, bool visible) {
-			if (index >= size()) return true;
-			buttonData[index].visible = visible;
-			return false;
-		}
-		bool setVisibleinText(std::string text, bool visible) {
-			return setVisibleinIndex(findinText(text), visible);
-		}
-		bool setVisibleinEvent(std::string event, bool visible) {
-			return setVisibleinIndex(findinEvent(event), visible);
-		}
-		bool setClickableinIndex(size_t index, bool clickable) {
-			if (index >= size()) return true;
-			buttonData[index].clickable = clickable;
-			return false;
-		}
-		bool setClickableinText(std::string text, bool clickable) {
-			return setClickableinIndex(findinText(text), clickable);
-		}
-		bool setClickableinEvent(std::string event, bool clickable) {
-			return setClickableinIndex(findinEvent(event), clickable);
-		}
-		struct timeval start();
-		short stop();
-		void cls();
+		return true;
+	}
+	bool erase(Button button) {
+		return erase(find(button));
+	}
+	bool eraseinText(std::string text) {
+		return erase(findinText(text));
+	}
+	bool eraseinEvent(std::string event) {
+		return erase(findinEvent(event));
+	}
+	Menu &clear() {
+		buttonData.clear();
+		buttonOffset.clear();
+		buttonHistory.clear();
+		return *this;
+	}
+	bool setVisibleinIndex(size_t index, bool visible) {
+		if (index >= size()) return true;
+		buttonData[index].visible = visible;
+		return false;
+	}
+	bool setVisibleinText(std::string text, bool visible) {
+		return setVisibleinIndex(findinText(text), visible);
+	}
+	bool setVisibleinEvent(std::string event, bool visible) {
+		return setVisibleinIndex(findinEvent(event), visible);
+	}
+	bool setClickableinIndex(size_t index, bool clickable) {
+		if (index >= size()) return true;
+		buttonData[index].clickable = clickable;
+		return false;
+	}
+	bool setClickableinText(std::string text, bool clickable) {
+		return setClickableinIndex(findinText(text), clickable);
+	}
+	bool setClickableinEvent(std::string event, bool clickable) {
+		return setClickableinIndex(findinEvent(event), clickable);
+	}
+	struct timeval start();
+	short stop();
+	void cls();
 };
 #define mouseLeftButton FROM_LEFT_1ST_BUTTON_PRESSED	// 左键
 #define mouseMiddleButton FROM_LEFT_2ND_BUTTON_PRESSED	// 中键
@@ -442,7 +433,6 @@ bool runMenu(Menu &menu, std::string &event) {
 				}
 				case mouseClick: {
 					if (mouseEvent.dwButtonState && mouseEvent.dwButtonState != mouseWheel) {
-						std::string res = "";
 						for (size_t i = 0; i < menu.buttonData.size(); ++i) {
 							if (menu.buttonData[i] == mouseEvent.dwMousePosition - menu.buttonOffset[i] - menu.position) {
 								printButton(menu.buttonData[i], menu.buttonOffset[i] + menu.position);
